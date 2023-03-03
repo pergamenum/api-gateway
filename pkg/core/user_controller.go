@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pergamenum/api-gateway/pkg/monitoring/logger"
-	u "github.com/pergamenum/api-gateway/pkg/utilities"
+	"github.com/pergamenum/go-utils-gin/logger"
+	m "github.com/pergamenum/go-utils-gin/messages"
 	"go.uber.org/zap"
 )
 
@@ -49,7 +49,7 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 	if err != nil {
 		log.With("error", err).
 			Error("ShouldBindJSON(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 		return
 	}
 
@@ -61,13 +61,13 @@ func (c *UserController) CreateUser(ctx *gin.Context) {
 		ctx.Status(http.StatusCreated)
 
 	case errUserAlreadyExists:
-		u.ErrorResponse(ctx, http.StatusConflict, err)
+		m.ErrorResponse(ctx, http.StatusConflict, err)
 
 	default:
 		log.With("user", user).
 			With("error", err).
 			Warn("CreateUser(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 	}
 }
 
@@ -85,13 +85,13 @@ func (c *UserController) ReadUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, ud)
 
 	case errUserNotFound:
-		u.ErrorResponse(ctx, http.StatusNotFound, err)
+		m.ErrorResponse(ctx, http.StatusNotFound, err)
 
 	default:
 		log.With("id", id).
 			With("error", err).
 			Warn("ReadUser(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 	}
 }
 
@@ -105,7 +105,7 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 	if err != nil {
 		log.With("error", err).
 			Error("ShouldBindJSON(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 		return
 	}
 
@@ -116,13 +116,13 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 		ctx.Status(http.StatusOK)
 
 	case errUserNotFound:
-		u.ErrorResponse(ctx, http.StatusNotFound, err)
+		m.ErrorResponse(ctx, http.StatusNotFound, err)
 
 	default:
 		log.With("uu", uu).
 			With("error", err).
 			Warn("UpdateUser(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 	}
 }
 
@@ -139,13 +139,13 @@ func (c *UserController) DeleteUser(ctx *gin.Context) {
 		ctx.Status(http.StatusOK)
 
 	case errUserNotFound:
-		u.ErrorResponse(ctx, http.StatusNotFound, err)
+		m.ErrorResponse(ctx, http.StatusNotFound, err)
 
 	default:
 		log.With("id", id).
 			With("error", err).
 			Error("...DeleteUser(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 	}
 }
 
@@ -158,7 +158,7 @@ func (c *UserController) SearchUsers(ctx *gin.Context) {
 	if err != nil {
 		log.With("error", err).
 			Error("toUserQuery(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 		return
 	}
 
@@ -175,7 +175,7 @@ func (c *UserController) SearchUsers(ctx *gin.Context) {
 	default:
 		log.With("error", err).
 			Error("SearchUsers(): Failed")
-		u.ErrorResponse(ctx, http.StatusBadRequest, err)
+		m.ErrorResponse(ctx, http.StatusBadRequest, err)
 	}
 }
 

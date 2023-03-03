@@ -7,15 +7,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
-	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/pergamenum/api-gateway/pkg/core"
-	"github.com/pergamenum/api-gateway/pkg/monitoring/logger"
-	u "github.com/pergamenum/api-gateway/pkg/utilities"
+	"github.com/pergamenum/go-utils-gin/logger"
+	"github.com/pergamenum/go-utils-gin/middleware"
 )
 
 func main() {
@@ -28,6 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatal("main.logger.Initialize(): Failed:", err)
 	}
+	l := logger.Get()
 
 	fsc, err := newFirestoreClient(context.Background(), os.Getenv("GCP_PROJECT_ID"))
 	if err != nil {
@@ -39,7 +38,9 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	addMiddleware(r)
+
+	middleware.AddRecovery(r, l.Desugar())
+	middleware.AddRequestLogger(r, l.Desugar())
 
 	r.POST("api/v1/user", coreAPI.User.CreateUser)
 	r.GET("api/v1/user/:id", coreAPI.User.ReadUser)
@@ -73,22 +74,6 @@ func validateEnvironment() {
 		m := strings.Join(missing, ", ")
 		log.Fatal(fmt.Sprint("Missing Environment Variables: ", m))
 	}
-}
-
-func addMiddleware(r *gin.Engine) {
-
-	// TODO: Auth Middleware
-	recovery := func(c *gin.Context, recovered interface{}) {
-		if err, ok := recovered.(string); ok {
-			u.ErrorResponse(c, http.StatusInternalServerError, err)
-			return
-		}
-		u.ErrorResponse(c, http.StatusInternalServerError)
-	}
-
-	l := logger.Get().Desugar()
-	r.Use(ginzap.CustomRecoveryWithZap(l, true, recovery))
-	r.Use(ginzap.Ginzap(l, time.RFC3339, true))
 }
 
 func newFirestoreClient(ctx context.Context, projectID string) (*firestore.Client, error) {

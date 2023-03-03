@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pergamenum/api-gateway/pkg/monitoring/logger"
+	"github.com/pergamenum/go-utils-gin/logger"
 	"go.uber.org/zap"
 )
 

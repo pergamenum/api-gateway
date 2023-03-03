@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/pergamenum/api-gateway/pkg/external"
-	"github.com/pergamenum/api-gateway/pkg/monitoring/logger"
+
+	fsu "github.com/pergamenum/go-utils-firestore"
+	"github.com/pergamenum/go-utils-gin/logger"
 	"go.uber.org/zap"
 )
 
@@ -28,12 +29,12 @@ type firestoreUser struct {
 }
 
 type UserFirestoreRepo struct {
-	fc  external.FirestoreCRUDS[firestoreUser]
+	fc  fsu.FirestoreCRUDS[firestoreUser]
 	log *zap.SugaredLogger
 }
 
 func NewUserFirestoreRepo(c *firestore.Client) *UserFirestoreRepo {
-	fc := external.NewCRUDS[firestoreUser](c, "user")
+	fc := fsu.NewCRUDS[firestoreUser](c, "user")
 	return &UserFirestoreRepo{
 		fc:  fc,
 		log: logger.Get().Named("core.UserFirestoreRepo"),
@@ -51,7 +52,7 @@ func (r *UserFirestoreRepo) CreateUser(ctx context.Context, user User) error {
 	switch err {
 	case nil:
 		// NO-OP
-	case external.ErrDocumentAlreadyExists:
+	case fsu.ErrDocumentAlreadyExists:
 		return errUserAlreadyExists
 
 	default:
@@ -67,7 +68,7 @@ func (r *UserFirestoreRepo) ReadUser(ctx context.Context, id string) (User, erro
 	switch err {
 	case nil:
 		// NO-OP
-	case external.ErrDocumentNotFound:
+	case fsu.ErrDocumentNotFound:
 		return User{}, errUserNotFound
 
 	default:
@@ -116,7 +117,7 @@ func (r *UserFirestoreRepo) SearchUsers(ctx context.Context, query []UserQuery) 
 	fqs := r.fromUserQuery(query)
 	fus, err := r.fc.Search(ctx, fqs)
 	if err != nil {
-		if err == external.ErrDocumentSkipped {
+		if err == fsu.ErrDocumentSkipped {
 			// Log the error, then carry on.
 			log.Error(err)
 		}
@@ -157,7 +158,7 @@ func (r *UserFirestoreRepo) fromUserUpdate(input UserUpdate) []firestore.Update 
 	return fus
 }
 
-func (r *UserFirestoreRepo) fromUserQuery(input []UserQuery) []external.Query {
+func (r *UserFirestoreRepo) fromUserQuery(input []UserQuery) []fsu.Query {
 
 	// fro = Firestore Relational Operator
 	fro := func(input string) string {
@@ -179,7 +180,7 @@ func (r *UserFirestoreRepo) fromUserQuery(input []UserQuery) []external.Query {
 		}
 	}
 
-	var qs []external.Query
+	var qs []fsu.Query
 	for _, uq := range input {
 
 		if uq.Key == "created" {
@@ -189,7 +190,7 @@ func (r *UserFirestoreRepo) fromUserQuery(input []UserQuery) []external.Query {
 			}
 		}
 
-		fq := external.Query{
+		fq := fsu.Query{
 			Path:     uq.Key,
 			Operator: fro(uq.Operator),
 			Value:    uq.Value,
