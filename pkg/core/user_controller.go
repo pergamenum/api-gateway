@@ -199,7 +199,7 @@ func (c *UserController) toUserUpdate(input userUpdateDTO) UserUpdate {
 
 func (q userQuery) toUserQuery() ([]UserQuery, error) {
 
-	qs, found := q["query"]
+	qs, found := q["q"]
 	if !found {
 		return []UserQuery{}, nil
 	}
@@ -208,7 +208,7 @@ func (q userQuery) toUserQuery() ([]UserQuery, error) {
 	for _, q := range qs {
 		split := strings.Split(q, ",")
 		if len(split) != 3 {
-			return nil, errors.New("invalid query: (" + q + ") must be query=(key),(operator),(value)")
+			return nil, errors.New("invalid query: (" + q + ") must be q=(key),(operator),(value)")
 		}
 
 		uq := UserQuery{

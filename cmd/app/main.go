@@ -12,6 +12,7 @@ import (
 	firebase "firebase.google.com/go"
 	"github.com/gin-gonic/gin"
 	"github.com/pergamenum/api-gateway/pkg/core"
+	"github.com/pergamenum/api-gateway/pkg/core/local"
 	"github.com/pergamenum/go-utils-gin/logger"
 	"github.com/pergamenum/go-utils-gin/middleware"
 )
@@ -35,14 +36,15 @@ func main() {
 	defer fsc.Close()
 
 	coreAPI := core.NewAPI(fsc)
-
+	localAPI := local.NewAPI(fsc)
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 
 	middleware.AddRecovery(r, l.Desugar())
 	middleware.AddRequestLogger(r, l.Desugar())
 
-	r.POST("api/v1/user", coreAPI.User.CreateUser)
+	//r.POST("api/v1/user", coreAPI.User.CreateUser)
+	r.POST("api/v1/user", localAPI.User.Create)
 	r.GET("api/v1/user/:id", coreAPI.User.ReadUser)
 	r.PATCH("api/v1/user", coreAPI.User.UpdateUser)
 	r.DELETE("api/v1/user/:id", coreAPI.User.DeleteUser)
