@@ -3,63 +3,44 @@ package core
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
-	"time"
 
-	"github.com/pergamenum/go-utils-gin/logger"
+	e "github.com/pergamenum/go-consensus-standards/ehandler"
+	i "github.com/pergamenum/go-consensus-standards/interfaces"
+	t "github.com/pergamenum/go-consensus-standards/types"
 	"go.uber.org/zap"
 )
 
-type UserService interface {
-	CreateUser(ctx context.Context, user User) error
-	ReadUser(ctx context.Context, id string) (User, error)
-	UpdateUser(ctx context.Context, update UserUpdate) error
-	DeleteUser(ctx context.Context, id string) error
-	SearchUsers(ctx context.Context, query []UserQuery) ([]User, error)
-}
-
-type User struct {
-	ID      string
-	Name    string
-	Created time.Time
-	Updated time.Time
-}
-
-type UserUpdate struct {
-	ID   string
-	Name *string
-}
-
-type UserQuery struct {
-	// Key should match the name of a User field.
-	Key string
-	// Operator represents relational operator, ex: EQ, LT, ...
-	Operator string
-	// Value should be a value of Key's underlying User field type, ex: string for Name.
-	Value any
-}
-
 type UserServo struct {
-	repo UserRepository
-	log  *zap.SugaredLogger
+	repo      i.Repository[User]
+	validator i.Validator[User]
+	log       *zap.SugaredLogger
 }
 
-func NewUserServo(repo UserRepository) *UserServo {
+type ServoConfig struct {
+	Repo      i.Repository[User]
+	Validator i.Validator[User]
+	Log       *zap.SugaredLogger
+}
+
+func NewUserServo(config ServoConfig) *UserServo {
+
+	namedLogger := config.Log.Named("UserServo")
+
 	return &UserServo{
-		repo: repo,
-		log:  logger.Get().Named("Core.UserServo"),
+		log:       namedLogger,
+		validator: config.Validator,
+		repo:      config.Repo,
 	}
 }
 
-func (s *UserServo) CreateUser(ctx context.Context, user User) error {
+func (s *UserServo) Create(ctx context.Context, user User) error {
 
-	err := user.isValid()
+	err := s.validator.ValidateModel(user)
 	if err != nil {
-		return err
+		return e.Wrap(err, e.ErrBadRequest)
 	}
 
-	err = s.repo.CreateUser(ctx, user)
+	err = s.repo.Create(ctx, user.ID, user)
 	if err != nil {
 		return err
 	}
@@ -67,199 +48,107 @@ func (s *UserServo) CreateUser(ctx context.Context, user User) error {
 	return nil
 }
 
-func (s *UserServo) ReadUser(ctx context.Context, id string) (User, error) {
+func (s *UserServo) Read(ctx context.Context, id string) (User, error) {
 
-	log := s.log.Named("ReadUser")
+	log := s.log.Named("Read")
 
 	if id == "" {
-		return User{}, errUserIDEmpty
+		return User{}, e.Wrap("(id missing)", e.ErrBadRequest)
 	}
 
-	user, err := s.repo.ReadUser(ctx, id)
+	user, err := s.repo.Read(ctx, id)
 	if err != nil {
 		return User{}, err
 	}
 
-	err = user.isValid()
+	err = s.validator.ValidateModel(user)
 	if err != nil {
 		log.With("user", user).
-			Error(errUserFoundInvalid)
-		return User{}, errUserFoundInvalid
+			Error(e.ErrCorrupt)
+		return User{}, e.Wrap(err, e.ErrCorrupt)
 	}
 
 	return user, nil
+
 }
 
-func (s *UserServo) UpdateUser(ctx context.Context, update UserUpdate) error {
+func (s *UserServo) Update(ctx context.Context, update t.Update) error {
 
-	err := update.isValid()
+	err := s.validator.ValidateUpdate(update)
 	if err != nil {
-		return err
+		return e.Wrap(err, e.ErrBadRequest)
 	}
 
-	if !s.userFound(ctx, update.ID) {
-		return errUserNotFound
-	}
+	id := update["id"].(string)
 
-	err = s.repo.UpdateUser(ctx, update)
+	err = s.userFound(ctx, id)
 	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *UserServo) DeleteUser(ctx context.Context, id string) error {
-
-	if id == "" {
-		return errUserIDEmpty
-	}
-
-	if !s.userFound(ctx, id) {
-		return errUserNotFound
-	}
-
-	err := s.repo.DeleteUser(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *UserServo) SearchUsers(ctx context.Context, query []UserQuery) ([]User, error) {
-
-	log := s.log.Named("SearchUsers")
-
-	for _, q := range query {
-		err := q.isValid()
-		if err != nil {
-			return nil, err
+		// Allow updating a corrupt resource.
+		if !errors.Is(err, e.ErrCorrupt) {
+			return err
 		}
 	}
 
-	users, err := s.repo.SearchUsers(ctx, query)
+	err = s.repo.Update(ctx, id, update)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserServo) Delete(ctx context.Context, id string) error {
+
+	if id == "" {
+		return e.Wrap("(id missing)", e.ErrBadRequest)
+	}
+
+	err := s.userFound(ctx, id)
+	if err != nil {
+		// Allow deleting a corrupt resource.
+		if !errors.Is(err, e.ErrCorrupt) {
+			return err
+		}
+	}
+
+	err = s.repo.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserServo) Search(ctx context.Context, query []t.Query) ([]User, error) {
+
+	log := s.log.Named("Search")
+
+	err := s.validator.ValidateQuery(query)
+	if err != nil {
+		err = e.Wrap(err, e.ErrBadRequest)
+		return nil, err
+	}
+
+	users, err := s.repo.Search(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
 	var vus []User
 	for _, vu := range users {
-		err = vu.isValid()
+		err = s.validator.ValidateModel(vu)
 		if err != nil {
 			log.With("user", vu).
-				Error(errUserFoundInvalid)
+				Error(e.ErrCorrupt)
 			continue
 		}
 		vus = append(vus, vu)
 	}
-	// Empty slice instead of nil slice. We don't want to send null body responses...?
-	if vus == nil {
-		vus = []User{}
-	}
 	return vus, nil
 }
 
-func (s *UserServo) userFound(ctx context.Context, id string) bool {
+func (s *UserServo) userFound(ctx context.Context, id string) error {
 
-	_, err := s.ReadUser(ctx, id)
-	return err == nil
-}
-
-const UserQueryTimeFormat = "2006-01-02_15:04"
-
-var (
-	errUserAlreadyExists = errors.New("user already exists")
-	errUserNotFound      = errors.New("user not found")
-	errUserFoundInvalid  = errors.New("user found, but invalid")
-	errUserIDEmpty       = errors.New("user id empty")
-)
-
-func (u User) isValid() error {
-
-	var sb strings.Builder
-
-	if u.ID == "" {
-		sb.WriteString("(id: empty) ")
-	}
-
-	if len(u.Name) > 100 {
-		sb.WriteString("(name: max 100 chars) ")
-	}
-
-	if len(sb.String()) > 0 {
-		cause := fmt.Sprint("invalid user: ", strings.TrimSpace(sb.String()))
-		return errors.New(cause)
-	} else {
-		return nil
-	}
-}
-
-func (u UserUpdate) isValid() error {
-
-	user := User{
-		ID: u.ID,
-	}
-
-	if u.Name != nil {
-		user.Name = *u.Name
-	}
-
-	return user.isValid()
-}
-
-func (q UserQuery) isValid() error {
-
-	var sb strings.Builder
-
-	validKeys := []string{"id", "name", "created"}
-	keyValid := false
-	for _, vk := range validKeys {
-		if strings.EqualFold(vk, q.Key) {
-			keyValid = true
-			break
-		}
-	}
-	if !keyValid {
-		sb.WriteString(fmt.Sprintf("(key[%v]: invalid) ", q.Key))
-	}
-
-	validOperators := []string{"EQ", "NE", "LT", "GT", "LE", "GE"}
-	operatorValid := false
-	for _, vo := range validOperators {
-		if strings.EqualFold(vo, q.Operator) {
-			operatorValid = true
-			break
-		}
-	}
-	if !operatorValid {
-		sb.WriteString(fmt.Sprintf("(operator[%v]: invalid) ", q.Operator))
-	}
-
-	valueValid := false
-	switch strings.ToLower(q.Key) {
-	case "id", "name":
-		if _, ok := q.Value.(string); ok {
-			valueValid = true
-		}
-	case "created":
-		if s, ok := q.Value.(string); ok {
-			_, err := time.Parse(UserQueryTimeFormat, s)
-			if err != nil {
-				sb.WriteString("time must be: YYYY-MM-DD_hh:mm ")
-				break
-			}
-			valueValid = true
-		}
-	}
-	if !valueValid && keyValid {
-		sb.WriteString(fmt.Sprintf("(value[%v]: invalid) ", q.Value))
-	}
-
-	if len(sb.String()) > 0 {
-		cause := fmt.Sprint("invalid query: ", strings.TrimSpace(sb.String()))
-		return errors.New(cause)
-	} else {
-		return nil
-	}
+	_, err := s.Read(ctx, id)
+	return err
 }
