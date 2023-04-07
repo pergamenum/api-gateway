@@ -10,18 +10,18 @@ import (
 )
 
 type User struct {
-	ID   string
-	Name string
+	ID   string `automap:"id"`
+	Name string `automap:"name"`
 }
 
 type UserDTO struct {
-	ID   string  `json:"id" binding:"required"`
-	Name *string `json:"name,omitempty"`
+	ID   string  `automap:"id" json:"id" binding:"required"`
+	Name *string `automap:"name" json:"name,omitempty"`
 }
 
 type UserEntity struct {
-	ID   string `firestore:"id"`
-	Name string `firestore:"name"`
+	ID   string `automap:"id" firestore:"id"`
+	Name string `automap:"name" firestore:"name"`
 }
 
 type UserManager struct {

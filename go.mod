@@ -6,9 +6,9 @@ require (
 	cloud.google.com/go/firestore v1.9.0
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/gin-gonic/gin v1.9.0
-	github.com/pergamenum/go-consensus-standards v0.3.1
+	github.com/pergamenum/go-consensus-standards v0.4.2
 	github.com/pergamenum/go-utils-firestore v0.0.5
-	github.com/pergamenum/go-utils-gin v0.1.2
+	github.com/pergamenum/go-utils-gin v0.1.3
 	go.uber.org/zap v1.24.0
 )
 

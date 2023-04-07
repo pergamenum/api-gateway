@@ -25,8 +25,7 @@ func newUserController(client *firestore.Client, log *zap.SugaredLogger) *c.Cont
 
 	dao := fs.NewDAO[UserEntity](client, "user", log)
 	rConf := r.RepoConfig[User, UserEntity]{
-		DAO:    dao,
-		Mapper: userManager,
+		DAO: dao,
 	}
 	repo := r.NewRepo(rConf)
 
